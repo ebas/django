@@ -28,7 +28,7 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import os, sys, time, signal
+import os, sys, time, signal, traceback
 
 try:
     import thread
@@ -84,8 +84,15 @@ def check_errors(fn):
         except (ImportError, IndentationError, NameError, 
                 SyntaxError, TypeError), msg:
             et, ev, tb = sys.exc_info()
-            if ev.filename not in _error_files:
-                _error_files.append(ev.filename)
+
+            if getattr(ev, 'filename', None) is None: 
+                # get the filename from the last item in the stack 
+                filename = traceback.extract_tb(tb)[-1][0] 
+            else: 
+                filename = ev.filename
+
+            if filename not in _error_files:
+                _error_files.append(filename)
 
             raise
     return wrapper
