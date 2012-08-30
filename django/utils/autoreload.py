@@ -51,10 +51,11 @@ RUN_RELOADER = True
 
 _mtimes = {}
 _win = (sys.platform == "win32")
+_error_files = []
 
 def code_changed():
     global _mtimes, _win
-    for filename in filter(lambda v: v, map(lambda m: getattr(m, "__file__", None), sys.modules.values())):
+    for filename in filter(lambda v: v, map(lambda m: getattr(m, "__file__", None), sys.modules.values())) + _error_files:
         if filename.endswith(".pyc") or filename.endswith(".pyo"):
             filename = filename[:-1]
         if filename.endswith("$py.class"):
@@ -70,8 +71,24 @@ def code_changed():
             continue
         if mtime != _mtimes[filename]:
             _mtimes = {}
+            try:
+                del _error_files[_error_files.index(filename)]
+            except ValueError: pass
             return True
     return False
+
+def check_errors(fn):
+    def wrapper(*args, **kwargs):
+        try:
+            fn(*args, **kwargs)
+        except (ImportError, IndentationError, NameError, 
+                SyntaxError, TypeError), msg:
+            et, ev, tb = sys.exc_info()
+            if ev.filename not in _error_files:
+                _error_files.append(ev.filename)
+
+            raise
+    return wrapper
 
 def ensure_echo_on():
     if termios:
@@ -141,5 +158,5 @@ def main(main_func, args=None, kwargs=None):
         reloader = jython_reloader
     else:
         reloader = python_reloader
-    reloader(main_func, args, kwargs)
-
+    wrapped_main_func = check_errors(main_func)
+    reloader(wrapped_main_func, args, kwargs)
