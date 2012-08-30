@@ -239,11 +239,16 @@ class DjangoTestSuiteRunner(object):
         self.verbosity = verbosity
         self.interactive = interactive
         self.failfast = failfast
+        self.signal_handler_set = False
 
     def setup_test_environment(self, **kwargs):
         setup_test_environment()
         settings.DEBUG = False
-        unittest.installHandler()
+        try:
+            unittest.installHandler()
+            self.signal_handler_set = True
+        except ValueError:
+            pass # Too bad, no SIGINT handling
 
     def build_suite(self, test_labels, extra_tests=None, **kwargs):
         suite = unittest.TestSuite()
@@ -337,7 +342,8 @@ class DjangoTestSuiteRunner(object):
                 connection.creation.destroy_test_db(old_name, self.verbosity)
 
     def teardown_test_environment(self, **kwargs):
-        unittest.removeHandler()
+        if self.signal_handler_set:
+            unittest.removeHandler()
         teardown_test_environment()
 
     def suite_result(self, suite, result, **kwargs):
